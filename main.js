@@ -10,26 +10,20 @@ function main() {
     initialize();
 
 
-    var canvasDim = new Vector2(256, 256);
-    var mazeDim = new Vector2(256, 256);
+    var canvasDim = new Vector2(128, 128);
+    var mazeDim = new Vector2(32, 32);
     
-    var canvas = document.getElementById("cnvs");
-    var ctx = canvas.getContext("2d");
+    var ctx = document.getElementById("cnvs").getContext("2d");
+    ctx.canvas.width = canvasDim.x;
+    ctx.canvas.height = canvasDim.y;
     
     var image = document.querySelector("img");
     
     ctx.drawImage(image, 0, 0, canvasDim.x, canvasDim.y);
     var imgData = ctx.getImageData(0, 0, canvasDim.x, canvasDim.y);
     
-
-
+    
     var factor = canvasDim.x / mazeDim.x;
-
-
-    var mask = ImageHandler.getImageMask(ImageHandler.getImageData(image, mazeDim));
-
-    // imgData = ImageHandler.turnGrayscale(imgData);
-
     
     var kernelGauss = [
         1/16,2/16,1/16,
@@ -41,26 +35,17 @@ function main() {
         -1,4,-1,
         0,-1,0
     ];
-   
-
-
-
     
     
     imgData = ImageHandler.turnGrayscale(imgData);
     imgData = ImageHandler.convolve(imgData, kernelRidge);
-    // imgData = ImageHandler.turn2Bit(imgData, 7);
-    // imgData = ImageHandler.invert(imgData);
-
     
-    
-    
-    mask = ImageHandler.getInvertedImageMask(imgData, 5);
-    console.log(mask);
     ctx.putImageData(imgData, 0, 0);
     
-    var mazeManager = new MazeManager(mazeDim, mask);
-
+    // var mask = ImageHandler.getImageMask(ImageHandler.getImageData(ctx.canvas, mazeDim), 5);
+    var mask = ImageHandler.getInvertedImageMask(ImageHandler.getImageData(ctx.canvas, mazeDim), 5);
+    console.log(mask);
+    
     for (let i = 0; i < mask.length; i++) {
         if (mask[i]) {
             ctx.fillStyle = "#ffffff";
@@ -70,6 +55,23 @@ function main() {
         let x = (i % mazeDim.x) * factor;
         let y = Math.floor(i / mazeDim.x) * factor;
         ctx.fillRect(x, y, factor, factor);
+    }
+    
+    
+    
+    var mazeManager = new MazeManager(mazeDim, mask);
+    mazeManager.generate();
+    var maze = mazeManager.maze;
+    
+    ctx.clearRect(0, 0, canvasDim.x, canvasDim.y);
+    ctx.strokeStyle = "#00ff00";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(factor*maze[0].x, factor*maze[0].y);
+    for (let i = 1; i < maze.length; i++) {
+        
+        ctx.lineTo(factor*maze[i].x, factor*maze[i].y);
+        ctx.stroke();
     }
 
 }

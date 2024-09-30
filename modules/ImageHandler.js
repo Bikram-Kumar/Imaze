@@ -15,8 +15,7 @@ export class ImageHandler {
         return (this.ctx.getImageData(0, 0, size.x, size.y));
         
     }
-
-
+    
 
     
     static convolve (imageData, kernel, sumKernel) {
