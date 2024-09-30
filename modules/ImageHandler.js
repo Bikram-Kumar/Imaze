@@ -17,25 +17,6 @@ export class ImageHandler {
     }
 
 
-    static convolveMask (mask, width, height, kernel, sumKernel) {
-        var cmask = new Array(mask.length);
-
-        for (let x = 1; x < width-1; x++) {
-            for (let y = 1; y < height-1; y++) {
-  
-                for (let kx = 0; kx < 3; kx++) {
-                    for (let ky = 0; ky < 3; ky++) {
-                        cmask[y*width + x] += kernel[(3 * ky) + kx] * mask[(width * (y - ky + 1)) + (x - kx + 1)];
-                    }
-                }
-                cmask[y*width + x] /= sumKernel;
-            }
-        }
-
-        return cmask;
-
-    }
-
 
     
     static convolve (imageData, kernel, sumKernel) {
@@ -44,7 +25,7 @@ export class ImageHandler {
 
         for (let x = 1; x < imageData.width-1; x++) {
             for (let y = 1; y < imageData.height-1; y++) {
-                sumR = 0;
+                sumR = 0; // cannot sum directly as ImageData.data is a clamping array
                 sumG = 0;
                 sumB = 0;
 
@@ -55,12 +36,42 @@ export class ImageHandler {
                         sumB += kernel[(3 * ky) + kx] * imageData.data[4*((imageData.width * (y - ky + 1)) + (x - kx + 1)) + 2];
                     }
                 }
-                cdata.data[4*((imageData.width * (y)) + (x))] = sumR / sumKernel;
-                cdata.data[4*((imageData.width * (y)) + (x)) + 1] = sumG / sumKernel;
-                cdata.data[4*((imageData.width * (y)) + (x)) + 2] = sumB / sumKernel;
+                cdata.data[4*((imageData.width * (y)) + (x))] = sumR ;
+                cdata.data[4*((imageData.width * (y)) + (x)) + 1] = sumG;
+                cdata.data[4*((imageData.width * (y)) + (x)) + 2] = sumB;
                 cdata.data[4*((imageData.width * (y)) + (x)) + 3] = 255;
-
+                
             }
+        }
+        
+        // filling in the border pixels 
+
+        let last = cdata.data.length - 4;
+
+        for (let i = 0; i < imageData.width; i++) {
+            // top
+            cdata.data[(4 * i)] = cdata.data[(4 * (imageData.width + i))];
+            cdata.data[(4 * i) + 1] = cdata.data[(4 * (imageData.width + i)) + 1];
+            cdata.data[(4 * i) + 2] = cdata.data[(4 * (imageData.width + i)) + 2];
+            cdata.data[(4 * i) + 3] = 255;
+
+            // bottom
+            cdata.data[last - (4 * i)] = cdata.data[last - (4 * (imageData.width + i))];
+            cdata.data[last - (4 * i) + 1] = cdata.data[last - (4 * (imageData.width + i)) + 1];
+            cdata.data[last - (4 * i) + 2] = cdata.data[last - (4 * (imageData.width + i)) + 2];
+            cdata.data[last - (4 * i) + 3] = 255;
+
+            // left
+            cdata.data[(4 * imageData.width * i)] = cdata.data[(4 * (imageData.width * i + 1))];
+            cdata.data[(4 * imageData.width * i) + 1] = cdata.data[(4 * (imageData.width * i + 1)) + 1];
+            cdata.data[(4 * imageData.width * i) + 2] = cdata.data[(4 * (imageData.width * i + 1)) + 2];
+            cdata.data[(4 * imageData.width * i) + 3] = 255;
+
+            // right
+            cdata.data[last - (4 * imageData.width * i)] = cdata.data[last - (4 * (imageData.width * i + 1))];
+            cdata.data[last - (4 * imageData.width * i) + 1] = cdata.data[last - (4 * (imageData.width * i + 1)) + 1];
+            cdata.data[last - (4 * imageData.width * i) + 2] = cdata.data[last - (4 * (imageData.width * i + 1)) + 2];
+            cdata.data[last - (4 * imageData.width * i) + 3] = 255;
         }
 
         return cdata;
@@ -88,23 +99,70 @@ export class ImageHandler {
     }
 
 
-    static getImageMask(imageData) {
+    static invert(imageData) {
+        var idata = new ImageData(imageData.width, imageData.height);
+
+        for (let i = 0; i < imageData.data.length; i+=4) {
+            idata.data[i] = 255 - imageData.data[i];
+            idata.data[i+1] = 255 - imageData.data[i+1];
+            idata.data[i+2] = 255 - imageData.data[i+2];
+            
+            idata.data[i+3] = 255;
+        }
+        
+        return idata;
+
+    }
+
+
+
+    // turns image into 2bit black and white image and returns as `ImageData`
+    static turn2Bit(imageData, threshold = 127) {
+        var bdata = new ImageData(imageData.width, imageData.height);
+
+        for (let i = 0; i < imageData.data.length; i+=4) {
+            bdata.data[i] = (imageData.data[i] > threshold) ? 255 : 0;
+            
+            bdata.data[i+1] = bdata.data[i];
+            bdata.data[i+2] = bdata.data[i];
+            bdata.data[i+3] = 255;
+        }
+        
+        return bdata;
+
+    }
+
+
+
+    
+    
+    // returns an array of boolean values denoting if RED channel has value greater than threshold 
+    static getImageMask(imageData, threshold = 127) {
        
         var mask = new Array(imageData.data.length / 4);
     
-    
         for (let i = 0; i < mask.length; i++) {
-            if (imageData.data[4*i] > 127) {
-                mask[i] =  true;
-            } else {
-                mask[i] =  false;
-
-            }
+            mask[i] = (imageData.data[4*i] > threshold);
         }
 
         return mask;
     
     }
+    
+    
+    // returns an array of boolean values denoting if RED channel has value less than or equal to threshold 
+    static getInvertedImageMask(imageData, threshold = 127) {
+       
+        var mask = new Array(imageData.data.length / 4);
+    
+        for (let i = 0; i < mask.length; i++) {
+            mask[i] = (imageData.data[4*i] <= threshold);
+        }
+
+        return mask;
+    
+    }
+
 
     // channel in range 0-1
     static srgbToLinear(channel) {
@@ -112,6 +170,8 @@ export class ImageHandler {
         return Math.pow((channel + 0.055) / 1.055, 2.4);
     }
     
+
+
     
     
     // channel in range 0-1
